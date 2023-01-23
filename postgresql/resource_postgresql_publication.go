@@ -183,15 +183,21 @@ func setPubTables(txn *sql.Tx, d *schema.ResourceData) error {
 	added := arrayDifference(newList, oldList)
 
 	for _, p := range added {
-		v := strings.Split(p.(string), ".")
-		query := fmt.Sprintf("ALTER PUBLICATION %s ADD TABLE %s.%s", pubName, pq.QuoteIdentifier(v[0]), pq.QuoteIdentifier(v[1]))
-		queries = append(queries, query)
+		if s, t, err := splitQualifiedTableName(p.(string)); err != nil {
+			return fmt.Errorf("could not alter split name: %w", err)
+		} else {
+			query := fmt.Sprintf("ALTER PUBLICATION %s ADD TABLE %s.%s", pubName, pq.QuoteIdentifier(s), pq.QuoteIdentifier(t))
+			queries = append(queries, query)
+		}
 	}
 
 	for _, p := range dropped {
-		v := strings.Split(p.(string), ".")
-		query := fmt.Sprintf("ALTER PUBLICATION %s DROP TABLE %s.%s", pubName, pq.QuoteIdentifier(v[0]), pq.QuoteIdentifier(v[1]))
-		queries = append(queries, query)
+		if s, t, err := splitQualifiedTableName(p.(string)); err != nil {
+			return fmt.Errorf("could not alter split name: %w", err)
+		} else {
+			query := fmt.Sprintf("ALTER PUBLICATION %s DROP TABLE %s.%s", pubName, pq.QuoteIdentifier(s), pq.QuoteIdentifier(t))
+			queries = append(queries, query)
+		}
 	}
 
 	for _, query := range queries {
@@ -463,7 +469,11 @@ func getTablesForPublication(d *schema.ResourceData) (string, error) {
 			return tablesString, fmt.Errorf("'%s' is duplicated for attribute `%s`", elem.(string), pubTablesAttr)
 		}
 		for _, t := range tables {
-			tlist = append(tlist, pq.QuoteIdentifier(t.(string)))
+			if s, t, err := splitQualifiedTableName(t.(string)); err != nil {
+				return "", fmt.Errorf("could not split name: %w", err)
+			} else {
+				tlist = append(tlist, fmt.Sprintf("%s.%s", pq.QuoteIdentifier(s), pq.QuoteIdentifier(t)))
+			}
 		}
 		tablesString = fmt.Sprintf("FOR TABLE %s", strings.Join(tlist, ", "))
 	}
@@ -574,4 +584,15 @@ func getDBPublicationName(d *schema.ResourceData, client *Client) (string, strin
 func getPublicationNameFromID(ID string) string {
 	splitted := strings.Split(ID, ".")
 	return splitted[0]
+}
+
+// splitQualifiedTableName returns the schema and the table name for a
+// fully qualified name in the form schema_name.table_name
+func splitQualifiedTableName(n string) (string, string, error) {
+	d := strings.Split(n, ".")
+	if len(d) != 2 {
+		return "", "", fmt.Errorf("Can't split fully qualified table name: %s", n)
+	}
+
+	return d[0], d[1], nil
 }
