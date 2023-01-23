@@ -184,7 +184,7 @@ func setPubTables(txn *sql.Tx, d *schema.ResourceData) error {
 
 	for _, p := range added {
 		if s, t, err := splitQualifiedTableName(p.(string)); err != nil {
-			return fmt.Errorf("could not alter split name: %w", err)
+			return fmt.Errorf("could not split table name for tables added to publication: %w", err)
 		} else {
 			query := fmt.Sprintf("ALTER PUBLICATION %s ADD TABLE %s.%s", pubName, pq.QuoteIdentifier(s), pq.QuoteIdentifier(t))
 			queries = append(queries, query)
@@ -193,7 +193,7 @@ func setPubTables(txn *sql.Tx, d *schema.ResourceData) error {
 
 	for _, p := range dropped {
 		if s, t, err := splitQualifiedTableName(p.(string)); err != nil {
-			return fmt.Errorf("could not alter split name: %w", err)
+			return fmt.Errorf("could not split table name for tables removed from publication: %w", err)
 		} else {
 			query := fmt.Sprintf("ALTER PUBLICATION %s DROP TABLE %s.%s", pubName, pq.QuoteIdentifier(s), pq.QuoteIdentifier(t))
 			queries = append(queries, query)
@@ -470,7 +470,7 @@ func getTablesForPublication(d *schema.ResourceData) (string, error) {
 		}
 		for _, t := range tables {
 			if s, t, err := splitQualifiedTableName(t.(string)); err != nil {
-				return "", fmt.Errorf("could not split name: %w", err)
+				return "", fmt.Errorf("could not split name for tables for publication: %w", err)
 			} else {
 				tlist = append(tlist, fmt.Sprintf("%s.%s", pq.QuoteIdentifier(s), pq.QuoteIdentifier(t)))
 			}
